@@ -391,8 +391,9 @@ namespace rsimpl
             libusb_device * usb_device;
             libusb_device_handle * usb_handle;
             std::vector<int> claimed_interfaces;
+            std::exception_ptr poll_exception;
 
-            device(std::shared_ptr<context> parent) : parent(parent), stop(), data_stop(), usb_device(), usb_handle() {}
+            device(std::shared_ptr<context> parent) : parent(parent), stop(), data_stop(), usb_device(), usb_handle(),poll_exception(nullptr) {}
             ~device()
             {
                 stop_streaming();
@@ -431,7 +432,16 @@ namespace rsimpl
 
                 thread = std::thread([this, subs]()
                 {
-                    while(!stop) subdevice::poll(subs);
+                    while(!stop)
+                        try
+                        {
+                            subdevice::poll(subs);
+                        }
+                        catch (const std::exception &e)
+                        {
+                            poll_exception = std::current_exception();
+                            return;
+                        }
                 });
             }
 
